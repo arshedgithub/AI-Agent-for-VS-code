@@ -1,5 +1,5 @@
 export * from './commands';
 export * from './config';
 export * from './services';
-export * from './types/structure.type';
+export * from './types';
 export * from './ui';

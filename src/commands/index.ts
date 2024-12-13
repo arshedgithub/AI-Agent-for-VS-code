@@ -5,8 +5,6 @@ import { DifyApiService, FileSystemService } from '../services';
 let projectStructure: ProjectStructure = null;
 
 export function registerCommands(context: vscode.ExtensionContext) {
-    console.log("registerCommands...");
-
     const fileSystemService = FileSystemService.getInstance();
     const difyApiService = DifyApiService.getInstance();
 
@@ -50,6 +48,7 @@ async function handleDifyResponse(
     outputChannel: vscode.OutputChannel
 ) {
     // Track conversation context
+    console.log("DIFY response : command file");
     let currentContext = { ...context };
 
     try {

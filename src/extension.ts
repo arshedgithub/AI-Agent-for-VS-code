@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
-import { registerCommands, StatusBarManager } from './';
+import { DifyApiService, registerCommands, StatusBarManager } from './';
 
-export function activate(context: vscode.ExtensionContext) {
-    console.log("DIFY assistat is activated");
+export async function activate(context: vscode.ExtensionContext) {
+    await DifyApiService.initialize(context);
+    console.log("DIFY AI assistant is activated");
     registerCommands(context);
     const statusBarManager = StatusBarManager.getInstance();
     context.subscriptions.push(statusBarManager.getStatusBarItem());

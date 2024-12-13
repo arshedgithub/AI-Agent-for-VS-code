@@ -1,15 +1,24 @@
+import * as vscode from 'vscode';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import { DIFYResponse, DIFYContext } from '../types';
+import { DIFY_API_KEY, DIFY_API_URL } from '../config';
 
 export class DifyApiService {
     private static instance: DifyApiService;
-    private readonly apiKey: string;
-    private readonly apiUrl: string;
+    private apiKey: string = '';
+    private readonly apiUrl: string = DIFY_API_URL;
+    private static secretStorage: vscode.SecretStorage;
 
-    private constructor() {
-        this.apiKey = process.env.DIFY_API_KEY || '';
-        this.apiUrl = process.env.DIFY_API_URL || '';
+    private constructor() {}
+
+    public static async initialize(context: vscode.ExtensionContext): Promise<void> {
+        DifyApiService.secretStorage = context.secrets;
+        
+        const storedKey = await context.secrets.get('difyApiKey');
+        if (!storedKey) {
+            await context.secrets.store('difyApiKey', DIFY_API_KEY);
+        }
     }
 
     public static getInstance(): DifyApiService {
@@ -19,12 +28,30 @@ export class DifyApiService {
         return DifyApiService.instance;
     }
 
+    private async getApiKey(): Promise<string> {
+        if (!this.apiKey) {
+            this.apiKey = await DifyApiService.secretStorage.get('difyApiKey') || '';
+            
+            if (!this.apiKey) {
+                // Fallback to config if storage fails
+                this.apiKey = DIFY_API_KEY;
+                // Try to store it again
+                await DifyApiService.secretStorage.store('difyApiKey', this.apiKey);
+            }
+        }
+        return this.apiKey;
+    }
+
     public async query(
-        query: string, 
+        query: string,
         context?: DIFYContext
     ): Promise<DIFYResponse> {
         try {
-            // Generate a unique conversation ID for first-time queries
+            const apiKey = await this.getApiKey();
+            if (!apiKey) {
+                throw new Error('API key not available');
+            }
+
             const conversationId = context?.conversation_id || '';
             
             const payload = {
@@ -32,8 +59,8 @@ export class DifyApiService {
                 query: query,
                 response_mode: "blocking",
                 conversation_id: conversationId,
-                user: `vscode-${uuidv4()}`, // Unique identifier for each VS Code user
-                files: [] // Optional: Add if needed
+                user: `vscode-${uuidv4()}`,
+                files: []
             };
 
             const response = await axios.post<DIFYResponse>(
@@ -41,7 +68,7 @@ export class DifyApiService {
                 payload,
                 {
                     headers: {
-                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Authorization': `Bearer ${apiKey}`,
                         'Content-Type': 'application/json'
                     }
                 }
@@ -57,10 +84,15 @@ export class DifyApiService {
                 created_at: response.data.created_at || Date.now()
             };
         } catch (error) {
-            if (error instanceof Error) {
-                throw new Error(`DIFY API Error: ${error.message}`);
+            if (axios.isAxiosError(error)) {
+                if (error.response?.status === 401) {
+                    await DifyApiService.secretStorage.delete('difyApiKey');
+                    this.apiKey = '';
+                    throw new Error('Invalid API key configuration');
+                }
+                throw new Error(`DIFY API Error: ${error.response?.data?.message || error.message}`);
             }
-            throw new Error('An unknown error occurred');
+            throw new Error(`DIFY API Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 }

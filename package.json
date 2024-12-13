@@ -1,0 +1,49 @@
+{
+    "name": "vscode-dify-assistant",
+    "displayName": "VS Code DIFY Assistant",
+    "description": "AI-powered code understanding with DIFY integration",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.60.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:difyassistant.analyzeProject",
+        "onCommand:difyassistant.askQuestion"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "difyassistant.analyzeProject",
+                "title": "DIFY: Analyze Project Structure"
+            },
+            {
+                "command": "difyassistant.askQuestion",
+                "title": "DIFY: Ask Question About Codebase"
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "lint": "eslint .",
+        "pretest": "npm run lint"
+    },
+    "dependencies": {
+        "axios": "^1.6.0"
+    },
+    "devDependencies": {
+        "@types/node": "^16.18.0",
+        "@types/vscode": "^1.60.0",
+        "@types/glob": "^7.1.4",
+        "@typescript-eslint/eslint-plugin": "^5.0.0",
+        "@typescript-eslint/parser": "^5.0.0",
+        "eslint": "^8.0.0",
+        "typescript": "^4.4.4",
+        "glob": "^7.1.7"
+    }
+}

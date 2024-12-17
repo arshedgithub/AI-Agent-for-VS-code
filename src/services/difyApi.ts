@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-import { DIFYResponse, DIFYContext } from '../types';
+import { DIFYResponse, DIFYContext, ProjectStructure } from '../types';
 import { DIFY_API_KEY, DIFY_API_URL } from '../config';
+import { ProjectContextService } from './projectContext';
 
 export class DifyApiService {
     private static instance: DifyApiService;
@@ -33,9 +34,7 @@ export class DifyApiService {
             this.apiKey = await DifyApiService.secretStorage.get('difyApiKey') || '';
             
             if (!this.apiKey) {
-                // Fallback to config if storage fails
                 this.apiKey = DIFY_API_KEY;
-                // Try to store it again
                 await DifyApiService.secretStorage.store('difyApiKey', this.apiKey);
             }
         }
@@ -44,7 +43,8 @@ export class DifyApiService {
 
     public async query(
         query: string,
-        context?: DIFYContext
+        context?: DIFYContext,
+        projectStructure?: ProjectStructure
     ): Promise<DIFYResponse> {
         try {
             const apiKey = await this.getApiKey();
@@ -54,9 +54,22 @@ export class DifyApiService {
 
             const conversationId = context?.conversation_id || '';
             
+            // Generate project context if available
+            const projectContextService = ProjectContextService.getInstance();
+            const projectContextSummary = projectStructure 
+                ? projectContextService.generateProjectSummary(projectStructure)
+                : '';
+
+            // Combine project context with query
+            const enhancedQuery = projectContextSummary 
+                ? `Project Context:\n${projectContextSummary}\n\nQuestion: ${query}` 
+                : query;
+
             const payload = {
-                inputs: {},
-                query: query,
+                inputs: {
+                    project_context: projectContextSummary
+                },
+                query: enhancedQuery,
                 response_mode: "blocking",
                 conversation_id: conversationId,
                 user: `vscode-${uuidv4()}`,

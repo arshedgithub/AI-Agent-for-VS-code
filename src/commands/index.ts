@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ProjectStructure, DIFYContext } from '../types';
-import { DifyApiService, FileSystemService } from '../services';
+import { DifyApiService, FileSystemService, ProjectContextService } from '../services';
 
 let projectStructure: ProjectStructure = null;
 
@@ -83,6 +83,7 @@ async function handleDifyResponse(
 
 function createAskQuestionCommand(difyApiService: DifyApiService) {
     let conversationContext: DIFYContext = {};
+    const contextService = ProjectContextService.getInstance();
 
     return async () => {
         if (!projectStructure) {
@@ -98,21 +99,40 @@ function createAskQuestionCommand(difyApiService: DifyApiService) {
         if (!question) return;
 
         try {
+            // Generate concise project context
+            const projectSummary = contextService.generateProjectSummary(projectStructure);
+            
+            // Get current file context if available
+            let fileContext = '';
+            if (vscode.window.activeTextEditor) {
+                const currentFile = vscode.window.activeTextEditor.document;
+                fileContext = contextService.generateFileContext(
+                    currentFile.fileName,
+                    currentFile.getText()
+                );
+            }
+
+            // Combine question with context
+            const enhancedQuery = `
+Context:
+${projectSummary}
+${fileContext}
+
+Question: ${question}`;
+
             const initialContext: DIFYContext = {
                 ...conversationContext,
-                projectStructure,
                 currentFile: vscode.window.activeTextEditor?.document.fileName
             };
 
             const outputChannel = vscode.window.createOutputChannel('DIFY Assistant');
             const result = await handleDifyResponse(
                 difyApiService,
-                question,
+                enhancedQuery,
                 initialContext,
                 outputChannel
             );
 
-            // Update conversation context for future queries
             conversationContext = result.context;
 
         } catch (error) {

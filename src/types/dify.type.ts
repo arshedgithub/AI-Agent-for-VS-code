@@ -1,5 +1,3 @@
-import { ProjectStructure } from "./structure.type";
-
 export interface DIFYResponse {
     event: string;
     message_id: string;
@@ -12,6 +10,6 @@ export interface DIFYResponse {
 
 export interface DIFYContext {
     conversation_id?: string;
-    projectStructure?: ProjectStructure;
     currentFile?: string;
+    projectSummary?: string;
 }

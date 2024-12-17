@@ -14,5 +14,11 @@ export const EXCLUDED_DIRECTORIES = [
     'out',
     '.next',
     'coverage',
-    '.env'
+];
+
+export const EXCLUDED_FILE_PATTERNS = [
+    /^\.env\..*/,
+    /^\.DS_Store$/,
+    /^thumbs\.db$/i,
+    /^desktop\.ini$/i
 ];

@@ -1,7 +1,7 @@
 import path from 'path';
 import { promises } from 'fs';
 import { FileStructure, DirectoryStructure, ProjectStructure } from '../types';
-import { SUPPORTED_EXTENSIONS, EXCLUDED_DIRECTORIES } from '../config/constants';
+import { SUPPORTED_EXTENSIONS, EXCLUDED_DIRECTORIES, EXCLUDED_FILE_PATTERNS } from '../config';
 
 export class FileSystemService {
     private static instance: FileSystemService;
@@ -50,8 +50,9 @@ export class FileSystemService {
     }
 
     private async processFile(fullPath: string, fileName: string): Promise<FileStructure | null> {
-        const ext = path.extname(fileName).toLowerCase();
+        if (EXCLUDED_FILE_PATTERNS.some(pattern => pattern.test(fileName))) return null;
 
+        const ext = path.extname(fileName).toLowerCase();
         if (!SUPPORTED_EXTENSIONS.includes(ext)) return null;
 
         try {

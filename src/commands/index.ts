@@ -44,10 +44,17 @@ function createAnalyzeProjectCommand(fileSystemService: FileSystemService) {
 }
 
 async function generateFiles(files: { path: string, content: string }[]): Promise<string[]> {
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath;
+
+    if (!workspaceRoot) {
+        vscode.window.showErrorMessage('No workspace folder is open.');
+        return [];
+    }
+
     const processedFiles: string[] = [];
 
     for (const file of files) {
-        const fullPath = path.resolve(vscode.workspace.workspaceFolders![0].uri.fsPath, file.path);
+        const fullPath = path.resolve(workspaceRoot, file.path);
 
         try {
             // Ensure the directory exists
@@ -64,6 +71,8 @@ async function generateFiles(files: { path: string, content: string }[]): Promis
                 if (existingContent.trim() !== file.content.trim()) {
                     await fs.writeFile(fullPath, file.content);
                     processedFiles.push(`Updated: ${file.path}`);
+                } else {
+                    processedFiles.push(`Skipped (no changes): ${file.path}`);
                 }
             } else {
                 await fs.writeFile(fullPath, file.content);
@@ -76,7 +85,6 @@ async function generateFiles(files: { path: string, content: string }[]): Promis
 
     return processedFiles;
 }
-
 async function handleDifyResponse(
     difyApiService: DifyApiService,
     question: string,

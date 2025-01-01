@@ -11,8 +11,7 @@
     ],
     "activationEvents": [
         "onCommand:difyassistant.analyzeProject",
-        "onCommand:difyassistant.askQuestion",
-        "onCommand:difyassistant.testFileGeneration"
+        "onCommand:difyassistant.askQuestion"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -24,10 +23,6 @@
             {
                 "command": "difyassistant.askQuestion",
                 "title": "DIFY: Ask Question About Codebase"
-            },
-            {
-                "command": "difyassistant.testFileGeneration",
-                "title": "DIFY: Test File Generation"
             }
         ]
     },

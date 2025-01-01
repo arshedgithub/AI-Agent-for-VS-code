@@ -20,40 +20,7 @@ export function registerCommands(context: vscode.ExtensionContext) {
         createAskQuestionCommand(difyApiService)
     );
 
-    const testCommand = vscode.commands.registerCommand(
-        'difyassistant.testFileGeneration',
-        testFileGeneration
-    );
-
-    context.subscriptions.push(analyzeCommand, askCommand, testCommand);
-}
-
-function testFileGeneration() {
-    console.log("test file called");
-    
-    return vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: "Testing file generation...",
-        cancellable: false
-    }, async () => {
-        try {
-            const testFiles = [{
-                path: 'test/test-file.txt',
-                content: 'This is a test file content'
-            }];
-
-            console.log('Testing file generation with:', testFiles);
-            const results = await generateFiles(testFiles);
-            console.log('Generation results:', results);
-
-            vscode.window.showInformationMessage('Test file generation complete');
-            return results;
-        } catch (error) {
-            console.error('Test failed:', error);
-            vscode.window.showErrorMessage('Test file generation failed: ' + (error instanceof Error ? error.message : String(error)));
-            throw error;
-        }
-    });
+    context.subscriptions.push(analyzeCommand, askCommand);
 }
 
 function createAnalyzeProjectCommand(fileSystemService: FileSystemService) {

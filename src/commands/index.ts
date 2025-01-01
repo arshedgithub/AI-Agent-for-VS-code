@@ -20,7 +20,40 @@ export function registerCommands(context: vscode.ExtensionContext) {
         createAskQuestionCommand(difyApiService)
     );
 
-    context.subscriptions.push(analyzeCommand, askCommand);
+    const testCommand = vscode.commands.registerCommand(
+        'difyassistant.testFileGeneration',
+        testFileGeneration
+    );
+
+    context.subscriptions.push(analyzeCommand, askCommand, testCommand);
+}
+
+function testFileGeneration() {
+    console.log("test file called");
+    
+    return vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "Testing file generation...",
+        cancellable: false
+    }, async () => {
+        try {
+            const testFiles = [{
+                path: 'test/test-file.txt',
+                content: 'This is a test file content'
+            }];
+
+            console.log('Testing file generation with:', testFiles);
+            const results = await generateFiles(testFiles);
+            console.log('Generation results:', results);
+
+            vscode.window.showInformationMessage('Test file generation complete');
+            return results;
+        } catch (error) {
+            console.error('Test failed:', error);
+            vscode.window.showErrorMessage('Test file generation failed: ' + (error instanceof Error ? error.message : String(error)));
+            throw error;
+        }
+    });
 }
 
 function createAnalyzeProjectCommand(fileSystemService: FileSystemService) {
@@ -92,34 +125,51 @@ async function handleDifyResponse(
     outputChannel: vscode.OutputChannel
 ) {
     let currentContext = { ...context };
+    const fileSystemService = FileSystemService.getInstance();
 
     try {
         // Send initial query
         const response = await difyApiService.query(question, currentContext);
+        outputChannel.appendLine('Question: ' + question);
+        outputChannel.appendLine('\nResponse:');
         outputChannel.appendLine(response.answer);
 
-        // Check if response contains file generation instructions
-        const fileGenerationMatch = response.answer.match(/```json\s*files\s*\n([\s\S]*?)```/i);
-        if (fileGenerationMatch) {
-            try {
-                const filesToGenerate = JSON.parse(fileGenerationMatch[1]);
-                console.log(`Parsed file generation instructions: ${JSON.stringify(filesToGenerate, null, 2)}`);
+        // Look for file generation instructions with more flexible pattern matching
+        const fileMatches = response.answer.match(/```(?:json)?\s*files?\s*\n([\s\S]*?)```/gmi);
 
-                if (Array.isArray(filesToGenerate)) {
-                    const processedFiles = await generateFiles(filesToGenerate);
+        if (fileMatches) {
+            for (const match of fileMatches) {
+                try {
+                    // Extract JSON content
+                    const jsonContent = match.replace(/```(?:json)?\s*files?\s*\n|\s*```/gi, '');
+                    const filesToGenerate = JSON.parse(jsonContent);
 
-                    if (processedFiles.length > 0) {
-                        outputChannel.appendLine('\nFiles Generated/Updated:');
-                        processedFiles.forEach(file => outputChannel.appendLine(file));
+                    if (Array.isArray(filesToGenerate)) {
+                        // Validate file objects
+                        const validFiles = filesToGenerate.filter(file =>
+                            file && typeof file.path === 'string' && typeof file.content === 'string'
+                        );
 
-                        vscode.window.showInformationMessage(`Generated/Updated ${processedFiles.length} file(s)`);
-                    } else {
-                        outputChannel.appendLine('No files were generated or updated.');
+                        if (validFiles.length > 0) {
+                            outputChannel.appendLine('\nGenerating files...');
+
+                            // Generate files
+                            const processedFiles = await generateFiles(validFiles);
+
+                            outputChannel.appendLine('\nFiles Generated:');
+                            processedFiles.forEach(file => outputChannel.appendLine(file));
+
+                            // Show success message
+                            vscode.window.showInformationMessage(
+                                `Successfully generated ${processedFiles.length} file(s)`
+                            );
+                        }
                     }
+                } catch (parseError) {
+                    console.error('Error parsing file instructions:', parseError);
+                    outputChannel.appendLine('\nError parsing file generation instructions');
+                    vscode.window.showErrorMessage('Failed to parse file generation instructions');
                 }
-            } catch (parseError) {
-                outputChannel.appendLine('Error parsing file generation instructions');
-                vscode.window.showWarningMessage('Could not parse file generation instructions');
             }
         }
 
@@ -183,8 +233,17 @@ ${fileContext}
 
 Question: ${question}
 
-Note: If you suggest generating or updating files, please wrap the file generation JSON in a files block. 
-The JSON should be an array of objects with 'path' and 'content' properties`;
+Note: If you need to generate or update files, please provide the file generation instructions in the following JSON format wrapped in a code block:
+
+\`\`\`json files
+[
+    {
+        "path": "relative/path/to/file.ts",
+        "content": "file content here"
+    }
+]
+\`\`\`
+`;
 
             const initialContext: DIFYContext = {
                 ...conversationContext,

@@ -92,54 +92,61 @@ async function handleDifyResponse(
     outputChannel: vscode.OutputChannel
 ) {
     let currentContext = { ...context };
-
     try {
-        // Send initial query
         const response = await difyApiService.query(question, currentContext);
+        outputChannel.appendLine('Question: ' + question);
+        outputChannel.appendLine('\nResponse:');
         outputChannel.appendLine(response.answer);
 
-        // Check if response contains file generation instructions
-        const fileGenerationMatch = response.answer.match(/```json\s*files\s*\n([\s\S]*?)```/i);
-        if (fileGenerationMatch) {
-            try {
-                const filesToGenerate = JSON.parse(fileGenerationMatch[1]);
-                console.log(`Parsed file generation instructions: ${JSON.stringify(filesToGenerate, null, 2)}`);
+        // More flexible pattern matching for JSON blocks
+        const jsonBlocks = response.answer.match(/```(?:json files?|json)\s*([\s\S]*?)```/gmi);
+        console.log('Found JSON blocks:', jsonBlocks);
 
-                if (Array.isArray(filesToGenerate)) {
-                    const processedFiles = await generateFiles(filesToGenerate);
+        if (jsonBlocks) {
+            for (const block of jsonBlocks) {
+                try {
+                    // Clean the JSON content - remove the ```json or ```json files wrapper
+                    const jsonContent = block.replace(/```(?:json files?|json)\s*|```/gi, '').trim();
+                    console.log('Cleaned JSON content:', jsonContent);
 
-                    if (processedFiles.length > 0) {
-                        outputChannel.appendLine('\nFiles Generated/Updated:');
-                        processedFiles.forEach(file => outputChannel.appendLine(file));
+                    const filesToGenerate = JSON.parse(jsonContent);
+                    console.log('Parsed files:', filesToGenerate);
 
-                        vscode.window.showInformationMessage(`Generated/Updated ${processedFiles.length} file(s)`);
-                    } else {
-                        outputChannel.appendLine('No files were generated or updated.');
+                    if (Array.isArray(filesToGenerate) && filesToGenerate.length > 0) {
+                        outputChannel.appendLine('\nGenerating files...');
+                        
+                        // Log each file to be generated
+                        filesToGenerate.forEach(file => {
+                            console.log('Processing file:', file.path);
+                        });
+
+                        const processedFiles = await generateFiles(filesToGenerate);
+                        
+                        outputChannel.appendLine('\nFiles Generated:');
+                        processedFiles.forEach(file => {
+                            outputChannel.appendLine(file);
+                            console.log('Generated:', file);
+                        });
+
+                        vscode.window.showInformationMessage(
+                            `Successfully generated ${processedFiles.length} file(s)`
+                        );
                     }
+                } catch (parseError: any) {
+                    console.error('Error parsing JSON:', parseError);
+                    outputChannel.appendLine(`\nError parsing file instructions: ${parseError.message}`);
                 }
-            } catch (parseError) {
-                outputChannel.appendLine('Error parsing file generation instructions');
-                vscode.window.showWarningMessage('Could not parse file generation instructions');
             }
-        }
-
-        // Store conversation ID for future queries
-        if (response.conversation_id) {
-            currentContext = {
-                ...currentContext,
-                conversation_id: response.conversation_id
-            };
+        } else {
+            console.log('No JSON blocks found in response');
+            outputChannel.appendLine('\nNo file generation instructions found');
         }
 
         outputChannel.show();
-        return {
-            response,
-            context: currentContext
-        };
+        return { response, context: currentContext };
     } catch (error) {
-        outputChannel.appendLine('\nError:');
-        outputChannel.appendLine(error instanceof Error ? error.message : 'An unknown error occurred');
-        outputChannel.show();
+        console.error('Response handler error:', error);
+        outputChannel.appendLine('\nError: ' + (error instanceof Error ? error.message : String(error)));
         throw error;
     }
 }
@@ -183,8 +190,17 @@ ${fileContext}
 
 Question: ${question}
 
-Note: If you suggest generating or updating files, please wrap the file generation JSON in a files block. 
-The JSON should be an array of objects with 'path' and 'content' properties`;
+Note: If you need to generate or update files, please provide the file generation instructions in the following JSON format wrapped in a code block:
+
+\`\`\`json files
+[
+    {
+        "path": "relative/path/to/file.ts",
+        "content": "file content here"
+    }
+]
+\`\`\`
+`;
 
             const initialContext: DIFYContext = {
                 ...conversationContext,
